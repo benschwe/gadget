@@ -77,14 +77,20 @@ class Gadget(PhysicalParamsU235):
         # TODO: The below
         # Neutron volumetric concentration matrix
         # Each row is a concentration across the radius at a simulated time
-        self.neutron_conc_matrix = np.zeros((self.num_time_steps + 1, 
-                                             self.num_points_radial))
+        # self.neutron_conc_matrix = np.zeros((self.num_time_steps + 1, 
+        #                                     self.num_points_radial))
+        
+        self.conc_list = []
+        init_conc_array = (np.zeros(self.num_points_radial) + 
+                           self.initial_neutron_conc_perm3)
+        init_conc_array[0:2] = self.initial_neutron_burst_conc_perm3
+        self.conc_list.append(init_conc_array)
 
         # Set initial concentration across radius
-        self.neutron_conc_matrix[0, :] = self.initial_neutron_conc_perm3
+        #self.neutron_conc_matrix[0, :] = self.initial_neutron_conc_perm3
         
         # Neutron concetration in first shell - "initiator"
-        self.neutron_conc_matrix[0, 1:3] = self.initial_neutron_burst_conc_perm3 
+        #self.neutron_conc_matrix[0, 1:3] = self.initial_neutron_burst_conc_perm3 
 
         # ***** G Matrix: Evolution matrix *****
         self.G = np.zeros((self.num_points_radial, self.num_points_radial))
@@ -122,31 +128,14 @@ class Gadget(PhysicalParamsU235):
         # Inverse evolution matrix
         self.Ginv = np.linalg.inv(self.G)
 
-
-    def run_sim(self):
-
-        # Wall clock timing
-        time_start_s = time.time()
-
-        # ***** Main simulation loop *****
-        for step in range(1, self.num_time_steps + 1):
-
-            # Get the row of concentrations from the previous timestep
-            conc_prev = self.neutron_conc_matrix[step - 1, :].copy()
-
-            # Neutron generation: rate * time = neutrons / m3
-            # We make this controllable for testing the diffusion code
-            if self.neutron_multiplication_on:
-                self.H = conc_prev * self.neutron_generation_rate * self.time_step_s
-
-            # Add BC and neutron generation matrices
-            temp = np.add(self.F, self.H)
-            
-            # Calcuate new neutron concentration values and overwrite conc matrix at
-            # new step
-            self.neutron_conc_matrix[step, :] = np.dot(self.Ginv, np.add(conc_prev, temp))
-
+    
+    def post_process(self):
+        '''
+        This creates useful calculations
+        '''
         # ***** Post processing for plotting and metrics *****
+        self.neutron_conc_matrix = np.stack(self.conc_list, axis=0)
+
         # Create a matrix for the radius
         self.radius_points = np.linspace(0, self.initial_radius_cm, self.num_points_radial)
 
@@ -183,10 +172,26 @@ class Gadget(PhysicalParamsU235):
         # Total neutrons: starting, generated, and left
         self.total_neutrons = self.neutrons_in_sphere + self.cumulative_neutrons_left
 
-        # Wall clock timing
-        time_end_s = time.time()
 
-        print(f'Elapsed sim time (ms): {(1000 * (time_end_s - time_start_s)):.2f}')
+    def run_sim_step(self) -> None:
+
+        # Get the row of concentrations from the previous timestep
+        #conc_prev = self.neutron_conc_matrix[step - 1, :].copy()
+        conc_prev = self.conc_list[-1].copy()
+        # Neutron generation: rate * time = neutrons / m3
+        # We make this controllable for testing the diffusion code
+        if self.neutron_multiplication_on:
+            self.H = conc_prev * self.neutron_generation_rate * self.time_step_s
+
+        # Add BC and neutron generation matrices
+        temp = np.add(self.F, self.H)
+        
+        # Calcuate new neutron concentration values and overwrite conc matrix at
+        # new step
+        #self.neutron_conc_matrix[step, :] = np.dot(self.Ginv, np.add(conc_prev, temp))
+        self.conc_list.append(np.dot(self.Ginv, np.add(conc_prev, temp)))
+
+        self.num_time_steps += 1
 
 
     def __init__(self,
@@ -204,9 +209,10 @@ class Gadget(PhysicalParamsU235):
         self.initial_radius_cm = initial_radius_cm
         self.initial_neutron_burst_conc_perm3 = initial_neutron_burst_conc_perm3
         self.time_step_s = time_step_s
-        self.num_time_steps = num_time_steps
         self.num_points_radial = num_points_radial
         self.neutron_multiplication_on = neutron_multiplication_on
+
+        self.num_time_steps = 0
 
         # delta_radius, used in matrix math
         self.dr_m = (self.initial_radius_cm / 100) / (self.num_points_radial - 1)
