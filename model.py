@@ -160,8 +160,8 @@ class Gadget(PhysicalParamsU235):
         # Neutron counts in each shell - TODO: Check number of shells vs points
         radii = np.array([self.dr_m * i for i in range(0, self.num_points_radial)])
 
-        shell_volumes_m3 = np.array([(4/3) * math.pi * (radii[i + 1] ** 3) - 
-                                     (4/3) * math.pi * (radii[i] ** 3) 
+        shell_volumes_m3 = np.array([(4 / 3) * math.pi * (radii[i + 1] ** 3) - 
+                                     (4 / 3) * math.pi * (radii[i] ** 3) 
                                      for i in range(0, len(radii) - 1)])
         
         # This multiplies the concentration at each time step times the shell volumes
@@ -175,9 +175,11 @@ class Gadget(PhysicalParamsU235):
 
     def run_sim_step(self) -> None:
 
+        t_start_s = time.time()
+
         # Get the row of concentrations from the previous timestep
-        #conc_prev = self.neutron_conc_matrix[step - 1, :].copy()
         conc_prev = self.conc_list[-1].copy()
+
         # Neutron generation: rate * time = neutrons / m3
         # We make this controllable for testing the diffusion code
         if self.neutron_multiplication_on:
@@ -188,10 +190,13 @@ class Gadget(PhysicalParamsU235):
         
         # Calcuate new neutron concentration values and overwrite conc matrix at
         # new step
-        #self.neutron_conc_matrix[step, :] = np.dot(self.Ginv, np.add(conc_prev, temp))
         self.conc_list.append(np.dot(self.Ginv, np.add(conc_prev, temp)))
 
         self.num_time_steps += 1
+
+        t_end_s = time.time()
+
+        return t_end_s - t_start_s
 
 
     def __init__(self,
@@ -212,6 +217,7 @@ class Gadget(PhysicalParamsU235):
         self.num_points_radial = num_points_radial
         self.neutron_multiplication_on = neutron_multiplication_on
 
+        # Housekeeping attributes/variables
         self.num_time_steps = 0
 
         # delta_radius, used in matrix math
