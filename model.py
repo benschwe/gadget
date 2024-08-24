@@ -1,7 +1,6 @@
 import numpy as np
 import math
 from params import PhysicalParamsU235, PhysicalParamsPu239
-import time
 from constants import *
 
 class Gadget(PhysicalParamsU235):
@@ -34,11 +33,18 @@ class Gadget(PhysicalParamsU235):
     
     
     @property
-    def num_fissions(self):
+    def num_fissions_occured(self):
 
         # Assuming each fission event yields the number of neutrons in
         # parameter list
-        return self.total_neutrons / self.parameters.neutrons_per_fission
+        return self.list_total_neutrons[-1] / self.parameters.neutrons_per_fission
+    
+
+    @property 
+    def num_fissions(self):
+
+        return np.array(self.list_total_neutrons) / self.parameters.neutrons_per_fission
+
 
 
     def set_initial_neutron_concentration(self,
@@ -131,7 +137,7 @@ class Gadget(PhysicalParamsU235):
     
     def post_process(self):
         '''
-        This creates useful calculations
+        This creates useful simulation data for plotting
         '''
         # ***** Post processing for plotting and metrics *****
         self.neutron_conc_matrix = np.stack(self.conc_list, axis=0)
@@ -142,42 +148,41 @@ class Gadget(PhysicalParamsU235):
         # Create a simulation time array - one in sec, one in us
         self.sim_time_array_s = np.array([self.time_step_s * i for i in range(0, self.num_time_steps + 1)])
         self.sim_time_array_us = self.sim_time_array_s * 1E6
-
-        # Estimate neutron concentration surface gradient | neutrons per m3 * 1 / m = neutrons / m4
-        self.dNdr = (self.neutron_conc_matrix[:, -2] - 
-                     self.neutron_conc_matrix[:, -1]) / self.dr_m
-
-        # Estimate neutron surface flux | neutrons / (m2*s)
-        self.surface_flux = self.parameters.neutron_diffusivity_m2pers * self.dNdr
-
-        # Estimate neutrons leaving surface (both as per sim step and cumulative)
-        self.neutrons_left = (self.surface_flux * 
-                              self.surface_area_m2 * 
-                              self.time_step_s)
-
-        self.cumulative_neutrons_left = self.neutrons_left.cumsum()
-
-        # Neutron counts in each shell - TODO: Check number of shells vs points
-        radii = np.array([self.dr_m * i for i in range(0, self.num_points_radial)])
-
-        shell_volumes_m3 = np.array([(4 / 3) * math.pi * (radii[i + 1] ** 3) - 
-                                     (4 / 3) * math.pi * (radii[i] ** 3) 
-                                     for i in range(0, len(radii) - 1)])
         
-        # This multiplies the concentration at each time step times the shell volumes
-        # It then sums all the neutron counts in the shells to get the total neturon 
-        # counts in the sphere for each time step 
-        self.neutrons_in_sphere = (self.neutron_conc_matrix[:, 0:-1] * shell_volumes_m3).sum(axis=1)
+        # # Estimate neutron concentration surface gradient | neutrons per m3 * 1 / m = neutrons / m4
+        # self.dNdr = (self.neutron_conc_matrix[:, -2] - 
+        #              self.neutron_conc_matrix[:, -1]) / self.dr_m
 
-        # Total neutrons: starting, generated, and left
-        self.total_neutrons = self.neutrons_in_sphere + self.cumulative_neutrons_left
+        # # Estimate neutron surface flux | neutrons / (m2*s)
+        # self.surface_flux = self.parameters.neutron_diffusivity_m2pers * self.dNdr
+
+        # # Estimate neutrons leaving surface (both as per sim step and cumulative)
+        # self.neutrons_left = (self.surface_flux * 
+        #                       self.surface_area_m2 * 
+        #                       self.time_step_s)
+
+        # self.cumulative_neutrons_left = self.neutrons_left.cumsum()
+
+        # # Neutron counts in each shell - TODO: Check number of shells vs points
+        # radii = np.array([self.dr_m * i for i in range(0, self.num_points_radial)])
+
+        # shell_volumes_m3 = np.array([(4 / 3) * math.pi * (radii[i + 1] ** 3) - 
+        #                              (4 / 3) * math.pi * (radii[i] ** 3) 
+        #                              for i in range(0, len(radii) - 1)])
+        
+        # # This multiplies the concentration at each time step times the shell volumes
+        # # It then sums all the neutron counts in the shells to get the total neturon 
+        # # counts in the sphere for each time step 
+        # self.neutrons_in_sphere = (self.neutron_conc_matrix[:, 0:-1] * shell_volumes_m3).sum(axis=1)
+
+        # # Total neutrons: in sphere (starting, generated), and left
+        # self.total_neutrons = self.neutrons_in_sphere + self.cumulative_neutrons_left
+        
 
 
     def run_sim_step(self) -> None:
 
-        t_start_s = time.time()
-
-        # Get the row of concentrations from the previous timestep
+        # Get the array row of concentrations from the previous timestep
         conc_prev = self.conc_list[-1].copy()
 
         # Neutron generation: rate * time = neutrons / m3
@@ -186,20 +191,55 @@ class Gadget(PhysicalParamsU235):
             self.H = conc_prev * self.neutron_generation_rate * self.time_step_s
 
         # Add BC and neutron generation matrices
+        # TODO: Remove F matrix since BCs are contained within the G matrix
         temp = np.add(self.F, self.H)
         
         # Calcuate new neutron concentration values and overwrite conc matrix at
         # new step
         self.conc_list.append(np.dot(self.Ginv, np.add(conc_prev, temp)))
 
+        # Placeholder for calulcation of flux, neutron counts, and fission
+        # events. Maybe heat generation too. Maybe more.
+
+        # Surface flux
+        # Estimate neutron concentration surface gradient | neutrons per m3 * 1 / m = neutrons / m4
+        # Notations here: self.conc_list[-1] is the most recent concentration array.
+        # self.conc_list[-1][-2] is the second to last element in the most recent
+        # concentration array
+        surface_conc_gradient_perm4 = (self.conc_list[-1][-2] - 
+                                       self.conc_list[-1][-1]) / self.dr_m
+        
+        # Surface flux is the concentration gradient * diffusivity
+        surface_flux_perm2s = (surface_conc_gradient_perm4 * 
+                               self.parameters.neutron_diffusivity_m2pers)
+        
+        # Estimate neutrons leaving surface in the time step
+        # Also tally total neutrons that left the surface
+        neutrons_left = (surface_flux_perm2s * 
+                         self.surface_area_m2 * 
+                         self.time_step_s)
+        
+        self.cumulative_neutrons_left += neutrons_left
+
+        # Estimate neutrons in sphere at this timestep
+        neutrons_in_sphere = (self.conc_list[-1][0:-1] * self.shell_volumes_m3).sum()
+        
+        # Total neutron count - in sphere and total left
+        self.total_neutrons = neutrons_in_sphere + self.cumulative_neutrons_left
+
+        # Lists of neutron counts
+        self.list_surface_flux_perm2s.append(surface_flux_perm2s)
+        self.list_neutrons_left_surface.append(neutrons_left)
+        self.list_cumulative_neutrons_left_surface.append(self.cumulative_neutrons_left)
+        self.list_total_neutrons_in_sphere.append(neutrons_in_sphere)
+        self.list_total_neutrons.append(self.total_neutrons)
+
+        # Increment the time steps elapsed
         self.num_time_steps += 1
-
-        t_end_s = time.time()
-
-        return t_end_s - t_start_s
 
 
     def __init__(self,
+                 name: str='me',
                  material: str='U235',
                  initial_radius_cm: float=5.0,
                  initial_neutron_conc=0,
@@ -210,6 +250,7 @@ class Gadget(PhysicalParamsU235):
                  neutron_multiplication_on=True
                  ) -> None:
 
+        self.name = name
         self.material = material
         self.initial_radius_cm = initial_radius_cm
         self.initial_neutron_burst_conc_perm3 = initial_neutron_burst_conc_perm3
@@ -219,9 +260,24 @@ class Gadget(PhysicalParamsU235):
 
         # Housekeeping attributes/variables
         self.num_time_steps = 0
+        self.list_surface_flux_perm2s = [0]
+        self.list_neutrons_left_surface = [0]
+        self.list_cumulative_neutrons_left_surface = [0]
+        self.list_total_neutrons_in_sphere = [0]
+        self.list_total_neutrons = [0]
+        
+        self.cumulative_neutrons_left = 0
+        self.total_neutrons = 0 # This gets overridden with the initial burst in the first timestep
 
         # delta_radius, used in matrix math
         self.dr_m = (self.initial_radius_cm / 100) / (self.num_points_radial - 1)
+
+        # Shell volumes
+        self.radii = np.array([self.dr_m * i for i in range(0, self.num_points_radial)])
+
+        self.shell_volumes_m3 = np.array([(4 / 3) * math.pi * (self.radii[i + 1] ** 3) - 
+                                          (4 / 3) * math.pi * (self.radii[i] ** 3) 
+                                          for i in range(0, len(self.radii) - 1)])
 
         if self.material == 'U235':
             self.parameters = PhysicalParamsU235()
