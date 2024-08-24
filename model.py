@@ -30,27 +30,6 @@ class Gadget(PhysicalParamsU235):
         num_active_nuclei = active_material_moles * AVOGADRO
 
         return num_active_nuclei
-    
-    
-    @property
-    def num_fissions_occured(self):
-
-        # Assuming each fission event yields the number of neutrons in
-        # parameter list
-        return self.list_total_neutrons[-1] / self.parameters.neutrons_per_fission
-    
-
-    @property 
-    def num_fissions(self):
-
-        return np.array(self.list_total_neutrons) / self.parameters.neutrons_per_fission
-
-
-
-    def set_initial_neutron_concentration(self,
-                                          initial_neutron_conc_perm3=0):
-        
-        self.initial_neutron_conc_perm3 = initial_neutron_conc_perm3
 
 
     def initialize_matrix_coeffs(self):
@@ -80,23 +59,13 @@ class Gadget(PhysicalParamsU235):
 
         # Matrices are indexed by row, column
 
-        # TODO: The below
         # Neutron volumetric concentration matrix
         # Each row is a concentration across the radius at a simulated time
-        # self.neutron_conc_matrix = np.zeros((self.num_time_steps + 1, 
-        #                                     self.num_points_radial))
-        
         self.conc_list = []
         init_conc_array = (np.zeros(self.num_points_radial) + 
                            self.initial_neutron_conc_perm3)
         init_conc_array[0:2] = self.initial_neutron_burst_conc_perm3
         self.conc_list.append(init_conc_array)
-
-        # Set initial concentration across radius
-        #self.neutron_conc_matrix[0, :] = self.initial_neutron_conc_perm3
-        
-        # Neutron concetration in first shell - "initiator"
-        #self.neutron_conc_matrix[0, 1:3] = self.initial_neutron_burst_conc_perm3 
 
         # ***** G Matrix: Evolution matrix *****
         self.G = np.zeros((self.num_points_radial, self.num_points_radial))
@@ -126,7 +95,7 @@ class Gadget(PhysicalParamsU235):
 
         # ***** F Matrix: Surface BC *****
         self.F = np.zeros(self.num_points_radial)
-        # Note - F is zeros in this formulation with dN/dr = -Z * N at the surface boundary
+        # Note - F is zero in this formulation with dN/dr = -Z * N at the surface boundary
 
         # ***** H Matrix: Neutron Generation *****
         self.H = np.zeros(self.num_points_radial)
@@ -148,6 +117,9 @@ class Gadget(PhysicalParamsU235):
         # Create a simulation time array - one in sec, one in us
         self.sim_time_array_s = np.array([self.time_step_s * i for i in range(0, self.num_time_steps + 1)])
         self.sim_time_array_us = self.sim_time_array_s * 1E6
+
+        # Energy released - Joules to kilotons
+        self.array_total_energy_released_kt = np.array(self.list_total_energy_released_j) * J_TO_KILOTON
         
         # # Estimate neutron concentration surface gradient | neutrons per m3 * 1 / m = neutrons / m4
         # self.dNdr = (self.neutron_conc_matrix[:, -2] - 
@@ -198,14 +170,13 @@ class Gadget(PhysicalParamsU235):
         # new step
         self.conc_list.append(np.dot(self.Ginv, np.add(conc_prev, temp)))
 
-        # Placeholder for calulcation of flux, neutron counts, and fission
-        # events. Maybe heat generation too. Maybe more.
-
         # Surface flux
-        # Estimate neutron concentration surface gradient | neutrons per m3 * 1 / m = neutrons / m4
+        # Estimate neutron concentration surface gradient 
+        # neutrons per m3 * 1 / m = neutrons / m4
         # Notations here: self.conc_list[-1] is the most recent concentration array.
-        # self.conc_list[-1][-2] is the second to last element in the most recent
-        # concentration array
+        #                 self.conc_list[-1][-2] is the second to last element 
+        #                 in the most recent
+        #                 concentration array
         surface_conc_gradient_perm4 = (self.conc_list[-1][-2] - 
                                        self.conc_list[-1][-1]) / self.dr_m
         
@@ -225,50 +196,60 @@ class Gadget(PhysicalParamsU235):
         neutrons_in_sphere = (self.conc_list[-1][0:-1] * self.shell_volumes_m3).sum()
         
         # Total neutron count - in sphere and total left
-        self.total_neutrons = neutrons_in_sphere + self.cumulative_neutrons_left
+        total_neutrons = neutrons_in_sphere + self.cumulative_neutrons_left
+        
+        # Total number of fissions
+        total_number_of_fissions = total_neutrons / self.parameters.neutrons_per_fission
 
-        # Lists of neutron counts
+        # Energy released due to fission of active nuclei
+        total_energy_released_j = total_number_of_fissions * self.parameters.energy_per_fission_j
+
+        # Lists of neutrons and fissions
         self.list_surface_flux_perm2s.append(surface_flux_perm2s)
         self.list_neutrons_left_surface.append(neutrons_left)
         self.list_cumulative_neutrons_left_surface.append(self.cumulative_neutrons_left)
         self.list_total_neutrons_in_sphere.append(neutrons_in_sphere)
-        self.list_total_neutrons.append(self.total_neutrons)
+        self.list_total_neutrons.append(total_neutrons)
+        self.list_total_number_of_fissions.append(total_number_of_fissions)
+        self.list_total_energy_released_j.append(total_energy_released_j)
 
         # Increment the time steps elapsed
         self.num_time_steps += 1
 
 
     def __init__(self,
-                 name: str='me',
+                 id: int=0,
                  material: str='U235',
-                 initial_radius_cm: float=5.0,
-                 initial_neutron_conc=0,
-                 initial_neutron_burst_conc_perm3=100,
-                 time_step_s=1E-8,
-                 num_time_steps=1000,
-                 num_points_radial=100,
-                 neutron_multiplication_on=True
+                 initial_radius_cm: float=7.0,
+                 initial_neutron_conc_perm3: float=0,
+                 initial_neutron_burst_conc_perm3: float=50000,
+                 time_step_s: float=1E-10,
+                 num_points_radial: int=100,
+                 neutron_multiplication_on: bool=True
                  ) -> None:
 
-        self.name = name
+        self.id = id
         self.material = material
         self.initial_radius_cm = initial_radius_cm
+        self.initial_neutron_conc_perm3 = initial_neutron_conc_perm3
         self.initial_neutron_burst_conc_perm3 = initial_neutron_burst_conc_perm3
         self.time_step_s = time_step_s
         self.num_points_radial = num_points_radial
         self.neutron_multiplication_on = neutron_multiplication_on
 
         # Housekeeping attributes/variables
+        # TODO: Make into a dataclass
         self.num_time_steps = 0
         self.list_surface_flux_perm2s = [0]
         self.list_neutrons_left_surface = [0]
         self.list_cumulative_neutrons_left_surface = [0]
         self.list_total_neutrons_in_sphere = [0]
         self.list_total_neutrons = [0]
+        self.list_total_number_of_fissions = [0]
+        self.list_total_energy_released_j = [0]
         
         self.cumulative_neutrons_left = 0
-        self.total_neutrons = 0 # This gets overridden with the initial burst in the first timestep
-
+        
         # delta_radius, used in matrix math
         self.dr_m = (self.initial_radius_cm / 100) / (self.num_points_radial - 1)
 
@@ -281,15 +262,13 @@ class Gadget(PhysicalParamsU235):
 
         if self.material == 'U235':
             self.parameters = PhysicalParamsU235()
-            print('Set up with U235')
+            #print('Set up with U235')
         elif self.material == 'Pu239':
             self.params = PhysicalParamsPu239()
-            print('Set up with Pu239')
+            #print('Set up with Pu239')
         else:
             raise ValueError('Incorrect material specified')
         
-         # TODO: simplify this or get rid of it if we dont need to set spatially varying neutron conc
-        self.set_initial_neutron_concentration(initial_neutron_conc) 
         self.initialize_matrix_coeffs()
         self.setup_matrices()
         
