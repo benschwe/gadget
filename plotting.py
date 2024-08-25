@@ -24,7 +24,7 @@ def plot_fissions_and_energy(gadget_list: List[Gadget]):
     ax[0].set_yscale('log')
     ax[1].set_yscale('log')
 
-    fig.suptitle('Number of fissions and energy released')
+    fig.suptitle('Number of Fissions and Energy Released')
     fig.legend()
     fig.tight_layout()
 
@@ -52,6 +52,7 @@ def plot_conc_and_surf_flux(gadget: Gadget):
 
     ax[0].legend()
     fig.suptitle('Neutron Concentration and Surface Flux')
+    fig.tight_layout()
 
 
 def plot_radial_concentration(gadget: Gadget):
