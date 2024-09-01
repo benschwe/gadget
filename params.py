@@ -18,7 +18,6 @@ class PhysicalParamsU235:
 
     @property
     def energy_per_fission_j(self) -> float:
-
         return self.energy_per_fission_mev * MEV_TO_EV * EV_TO_J
 
     @property

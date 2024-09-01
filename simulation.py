@@ -8,15 +8,15 @@ class Simulation():
     def __init__(self, 
                  gadget_list: List[Gadget],
                  sim_duration_us: float=5,
-                 dt_us: float=0.001,
                  stop_when_nuclei_limit_met=True) -> None:
         
         self.gadget_list = gadget_list
         self.sim_duration_us = sim_duration_us
-        self.dt_us = dt_us
         self.stop_when_nuclei_limit_met = stop_when_nuclei_limit_met
         
-        self.sim_steps = math.ceil(sim_duration_us / dt_us)
+        # For now, we use the time step for the first gadget in the list
+        # This silently implies that each gadget should have the same time_step_s
+        self.sim_steps = math.ceil((sim_duration_us / 1E6) / gadget_list[0].time_step_s)
         print(f'Number of sim steps in all simulations: {self.sim_steps}')
         print('')
 
