@@ -4,27 +4,27 @@ from model import Gadget
 import numpy as np
 
 
-def plot_fissions_and_energy(gadget_list: List[Gadget]):
+def plot_fission_rate_and_energy(gadget_list: List[Gadget]):
 
     fig, ax = plt.subplots(2, 1, sharex=True, figsize = (8, 8))
     
     for g in gadget_list:
 
-        # Number of fissions
-        ax[0].plot(g.sim_time_array_us, g.list_total_number_of_fissions)
+        # Fission rate
+        ax[0].plot(g.sim_time_array_us, g.array_fission_rate_pers)
         
         # Total energy (kt)
         ax[1].plot(g.sim_time_array_us, g.array_total_energy_released_kt,
-                label = 'ID: ' + str(g.id) + ', ' + str(g.initial_radius_cm) + ' cm')
-
+                   label = 'ID: ' + str(g.id) + ', ' + str(g.initial_radius_cm) + ' cm')
+       
     ax[1].set_xlabel('Time (us)')
-    ax[0].set_ylabel('Fission Count')
+    ax[0].set_ylabel('Fission Rate (1/s)')
     ax[1].set_ylabel('Energy Released (kt)')
 
-    ax[0].set_yscale('log')
-    ax[1].set_yscale('log')
+    #ax[0].set_yscale('log')
+    #ax[1].set_yscale('log')
 
-    fig.suptitle('Number of Fissions and Energy Released')
+    fig.suptitle('Fission Rate and Total Energy Released')
     fig.legend()
     fig.tight_layout()
 
@@ -103,3 +103,26 @@ def plot_neutron_counts(gadget: Gadget):
     ax.set_xlabel('Time (us)')
     ax.set_ylabel('Neutron Count')
     ax.legend()
+
+
+def plot_radius_and_pressure(gadget: Gadget):
+
+    fig, ax = plt.subplots(2, 1, sharex=True, figsize = (8, 8))
+    ax[0].plot(gadget.sim_time_array_us, 100 * gadget.array_radius_m,
+               color = 'black')
+
+    ax[1].plot(gadget.sim_time_array_us, gadget.array_pressure_pa,
+               color = 'black')
+
+    #ax[0].set_yscale('log')
+    #ax[1].set_yscale('log')
+    #ax[1].set_ylim(1E-16)
+
+    #ax[1].set_xscale('log')
+
+    ax[1].set_xlabel('Time (us)')
+    ax[0].set_ylabel('Radius (cm)')
+    ax[1].set_ylabel('Pressure (Pa)')
+
+    fig.suptitle('Radius and Pressure as a Function of Time')
+    fig.tight_layout()
