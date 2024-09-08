@@ -13,7 +13,7 @@ class PhysicalParamsU235:
     neutrons_per_fission: float = 2.637
     nuclear_number_density_perm3: float = 4.794E22 * 1E6 # 1/ - Density of U235 nuclei
     tau_s: float = 8.635e-9
-    vel_neutron_mpers = 1.9561E7 # m/sec
+    vel_neutron_mpers = 1.9561E7 # m/sec (Carey Sublette lists 1.4E7 as more reasonable due to scattering)
     energy_per_fission_mev = 173.0
 
     @property

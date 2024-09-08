@@ -1,6 +1,6 @@
 from typing import List
 import math
-from model import Gadget
+from model_v3 import Gadget
 import time
 
 class Simulation():
