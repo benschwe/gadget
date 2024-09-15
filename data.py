@@ -1,7 +1,5 @@
 from dataclasses import dataclass
 from numpy import array
-from pandas import DataFrame
-
 @dataclass
 class States:
 

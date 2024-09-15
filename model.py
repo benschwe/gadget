@@ -1,7 +1,7 @@
 import numpy as np
 import math
 from params import PhysicalParamsU235, PhysicalParamsPu239
-from data_v2 import States
+from data import States
 from constants import *
 from pandas import DataFrame
 
@@ -10,7 +10,7 @@ class Gadget(PhysicalParamsU235):
     @property
     def number_active_nuclei(self) -> float:
 
-        active_material_moles = (self.parameters.fraction_u235 * 
+        active_material_moles = (self.parameters.fraction_active_material * 
                                 (self.mass_kg / 
                                 (self.parameters.atomic_mass_kgpermol)))
         

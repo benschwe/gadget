@@ -1,7 +1,7 @@
 from matplotlib import pyplot as plt
 from typing import List
 import numpy as np
-from model_v3 import Gadget
+from model import Gadget
 
 
 def generic_timeseries_plot(gadget_list: List[Gadget],
