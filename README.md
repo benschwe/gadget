@@ -6,7 +6,8 @@ A gadget device is made by instantiating a gadget object. Initial arguments are 
 
 Once an object is created, a simulation step can be run by calling the run_sim_step() method. This method will execute a single simulation step lasting for a duration of time_step_s (defined in the gadget constructor).
 
-## Basic Example
-basic_example.ipynb
+## Basic Examples
+* U235_Critical_Radius.ipynb
+* U235_compression_ratio_example.ipynb
 
 
