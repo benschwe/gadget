@@ -1,8 +1,8 @@
 import numpy as np
 import math
-from params import PhysicalParamsU235, PhysicalParamsPu239
-from data import States
-from constants import *
+from model.params import PhysicalParamsU235, PhysicalParamsPu239
+from model.data import States
+from model.constants import *
 from pandas import DataFrame
 
 class Gadget(PhysicalParamsU235):

@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from constants import *
+from model.constants import *
 
 @dataclass
 class PhysicalParamsU235:
